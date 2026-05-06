@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { db } from './db.js';
+import { db } from '../db.js';
 
 import productos from './routes/productos.js';
 import inventario from './routes/inventario.js';

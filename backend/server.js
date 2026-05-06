@@ -17,6 +17,7 @@ import auth from '../routes/auth.js';
 import usuarios from '../routes/usuarios.js';
 import clientes from '../routes/clientes.js';
 
+// Configuración necesaria para usar "path" y "__dirname" en módulos ES6 (import)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -24,16 +25,11 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-
-// --- CONFIGURACIÓN PARA VER TU PÁGINA (FRONTEND) ---
-
-// 1. Le decimos a Express que sirva todos los archivos de la raíz (html, css, js)
-app.use(express.static(path.join(__dirname, '../')));
-
-// 2. Rutas de la API
 app.use('/api/auth', auth);
+
+// 🔥 RUTAS DE LA API
 app.use('/api/productos', productos);
-app.use('/api/producto', productos);
+app.use('/api/producto', productos); // para POST
 app.use('/api/inventario', inventario);
 app.use('/api/dashboard', dashboard);
 app.use('/api/alertas', alertas);
@@ -55,11 +51,10 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-// Usamos '(.*)' en lugar de solo '*'
-app.get('(.*)', (req, res) => {
-    if (!req.path.startsWith('/api/')) {
-        res.sendFile(path.join(__dirname, '../index.html'));
-    }
+
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
 const PORT = process.env.PORT || 3000;

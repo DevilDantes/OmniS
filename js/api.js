@@ -1,6 +1,6 @@
 const API = {
   // ATENCIÓN: Esta URL debe apuntar a tu n8n local o Cloud.
-  BASE_URL: 'http://localhost:3000/api', 
+  BASE_URL: 'https://omnis-production-9049.up.railway.app/api', 
 
   // Enviar datos a n8n (Guardar)
   post: async (endpoint, data) => {

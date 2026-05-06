@@ -76,7 +76,7 @@ const App = {
         btn.disabled = true;
 
         try {
-          const res = await fetch('http://localhost:3000/api/usuarios/perfil', {
+          const res = await fetch('https://omnis-production-9049.up.railway.app/api/usuarios/perfil', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -918,7 +918,7 @@ const App = {
   eliminarUsuario: async (id) => {
     if (confirm("¿Estás seguro de dar de baja a este empleado? Ya no podrá iniciar sesión.")) {
       try {
-        const res = await fetch(`http://localhost:3000/api/usuarios/${id}`, {
+        const res = await fetch(`https://omnis-production-9049.up.railway.app/api/usuarios/${id}`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json'
@@ -951,7 +951,7 @@ const App = {
   reactivarUsuario: async (id) => {
     if (confirm("¿Estás seguro de reactivar a este empleado? Podrá volver a iniciar sesión.")) {
       try {
-        const res = await fetch(`http://localhost:3000/api/usuarios/${id}/reactivar`, {
+        const res = await fetch(`https://omnis-production-9049.up.railway.app/api/usuarios/${id}/reactivar`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -980,7 +980,7 @@ async function cargarClientesAdmin() {
   tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Cargando clientes...</td></tr>';
   
   try {
-    const res = await fetch('http://localhost:3000/api/clientes');
+    const res = await fetch('https://omnis-production-9049.up.railway.app/api/clientes');
     const clientes = await res.json();
     
     tbody.innerHTML = '';

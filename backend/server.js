@@ -55,9 +55,8 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-// 3. 🔥 ESTO ES LO IMPORTANTE: Al entrar a la URL, envía el index.html
-app.get('*', (req, res) => {
-    // Si la ruta NO empieza con /api/, enviamos el archivo index.html
+// Usamos '(.*)' en lugar de solo '*'
+app.get('(.*)', (req, res) => {
     if (!req.path.startsWith('/api/')) {
         res.sendFile(path.join(__dirname, '../index.html'));
     }

@@ -12,7 +12,7 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
   alertBox.classList.add('d-none'); // Ocultar alerta previa
 
   try {
-    const response = await fetch('http://localhost:3000/api/auth/login', { // <--- Agregamos http://localhost:3000
+    const response = await fetch('https://omnis-production-9049.up.railway.app/api/auth/login', { // <--- Agregamos http://localhost:3000
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ correo, password })

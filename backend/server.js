@@ -2,18 +2,18 @@ import express from 'express';
 import cors from 'cors';
 import { db } from '../db.js';
 
-import productos from './routes/productos.js';
-import inventario from './routes/inventario.js';
-import dashboard from './routes/dashboard.js';
-import alertas from './routes/alertas.js';
-import proveedores from './routes/proveedores.js';
-import categorias from './routes/categorias.js';
-import ventas from './routes/ventas.js';
-import reportes from './routes/reportes.js';
-import marcas from './routes/marcas.js';
-import auth from './routes/auth.js';
-import usuarios from './routes/usuarios.js';
-import clientes from './routes/clientes.js';
+import productos from '../routes/productos.js';
+import inventario from '../routes/inventario.js';
+import dashboard from '../routes/dashboard.js';
+import alertas from '../routes/alertas.js';
+import proveedores from '../routes/proveedores.js';
+import categorias from '../routes/categorias.js';
+import ventas from '../routes/ventas.js';
+import reportes from '../routes/reportes.js';
+import marcas from '../routes/marcas.js';
+import auth from '../routes/auth.js';
+import usuarios from '../routes/usuarios.js';
+import clientes from '../routes/clientes.js';
 
 const app = express();
 

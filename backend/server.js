@@ -41,23 +41,12 @@ app.use('/api/marcas', marcas);
 app.use('/api/usuarios', usuarios);
 app.use('/api/clientes', clientes);
 
-// ... todas tus rutas de app.use('/api/...') ...
 
-// Ruta de salud
-app.get('/api/health', async (req, res) => {
-    try {
-        await db.query('SELECT 1'); 
-        res.status(200).json({ status: 'ok', message: 'Servicios en línea' });
-    } catch (error) {
-        res.status(500).json({ status: 'error', message: 'Fallo en Base de Datos' });
-    }
-});
 
-// 🔥 ESTA ES LA RUTA QUE DEBES CAMBIAR:
-app.get('/:any*', (req, res) => {
-    if (!req.path.startsWith('/api/')) {
-        res.sendFile(path.join(__dirname, '../index.html'));
-    }
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
@@ -65,7 +54,3 @@ app.listen(PORT, () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor escuchando en el puerto ${PORT}`);
-});

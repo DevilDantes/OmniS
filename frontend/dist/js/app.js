@@ -26,7 +26,8 @@ const App = {
     setInterval(App.chequearEstadoReal, 15000);
     
     setInterval(App.cargarAlertas, 15000); 
-    setInterval(App.cargarVentas, 15000); 
+    setInterval(App.cargarVentas, 15000);
+    setInterval(App.cargarAuditoria, 30000); // Cargar auditoría cada 30 segundos 
   },
 
   actualizarInterfazUsuario: () => {
@@ -369,6 +370,21 @@ const App = {
         } finally {
           UI.setLoading(btn, false);
         }
+      });
+    }
+
+    // Event listener para filtro de auditoría
+    const auditFiltro = document.getElementById('audit-filtro');
+    if (auditFiltro) {
+      auditFiltro.addEventListener('change', () => {
+        App.cargarAuditoria();
+      });
+    }
+
+    const btnRefreshAuditoria = document.getElementById('btn-refresh-auditoria');
+    if (btnRefreshAuditoria) {
+      btnRefreshAuditoria.addEventListener('click', () => {
+        App.cargarAuditoria();
       });
     }
   },
@@ -969,6 +985,61 @@ const App = {
         if(window.Swal) Swal.fire('Error', 'Error al reactivar al usuario.', 'error');
         else alert("Error al reactivar al usuario.");
       }
+    }
+  },
+
+  cargarAuditoria: async () => {
+    // Cargar métricas de auditoría
+    const auditEventosHoy = document.getElementById('audit-eventos-hoy');
+    const auditExitosas = document.getElementById('audit-exitosas');
+    const auditAlertas = document.getElementById('audit-alertas');
+    const tbody = document.getElementById('auditoria-body');
+    const filtro = document.getElementById('audit-filtro');
+
+    if (!tbody) return;
+
+    try {
+      const auditoria = await API.get('auditoria');
+      
+      // Filtrar por tipo si hay filtro
+      let datosFiltrados = auditoria;
+      if (filtro && filtro.value !== 'todos') {
+        datosFiltrados = auditoria.filter(item => item.modulo === filtro.value);
+      }
+
+      // Métricas
+      const hoy = new Date().toISOString().split('T')[0];
+      const eventosHoy = auditoria.filter(item => item.fecha.startsWith(hoy)).length;
+      const exitosas = auditoria.filter(item => item.estado === 'exitoso').length;
+      const alertas = auditoria.filter(item => item.estado === 'alerta').length;
+
+      if (auditEventosHoy) auditEventosHoy.textContent = eventosHoy;
+      if (auditExitosas) auditExitosas.textContent = exitosas;
+      if (auditAlertas) auditAlertas.textContent = alertas;
+
+      // Tabla
+      tbody.innerHTML = '';
+      if (datosFiltrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No hay registros de auditoría.</td></tr>';
+        return;
+      }
+
+      datosFiltrados.slice(0, 50).forEach(item => { // Limitar a 50 registros
+        let estadoBadge = item.estado === 'exitoso' ? 'bg-success' : item.estado === 'error' ? 'bg-danger' : 'bg-warning';
+        tbody.innerHTML += `
+          <tr>
+            <td>${new Date(item.fecha).toLocaleString()}</td>
+            <td>${item.usuario}</td>
+            <td>${item.accion}</td>
+            <td>${item.modulo}</td>
+            <td>${item.detalles}</td>
+            <td><span class="badge ${estadoBadge}">${item.estado}</span></td>
+          </tr>
+        `;
+      });
+    } catch (error) {
+      console.error("Error cargando auditoría:", error);
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar auditoría.</td></tr>';
     }
   }
 }; // 💡 ¡ESTA ES LA LLAVE QUE FALTABA PARA CERRAR EL OBJETO APP!

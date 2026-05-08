@@ -27,7 +27,7 @@ const App = {
     
     setInterval(App.cargarAlertas, 15000); 
     setInterval(App.cargarVentas, 15000);
-    setInterval(App.cargarAuditoria, 30000); // Cargar auditoría cada 30 segundos 
+    // Auditoría se carga bajo demanda (cuando el usuario accede a la sección) 
   },
 
   actualizarInterfazUsuario: () => {
@@ -998,6 +998,9 @@ const App = {
 
     if (!tbody) return;
 
+    // Mostrar cargando
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Cargando auditoría...</td></tr>';
+
     try {
       const auditoria = await API.get('auditoria');
       
@@ -1011,11 +1014,11 @@ const App = {
       const hoy = new Date().toISOString().split('T')[0];
       const eventosHoy = auditoria.filter(item => item.fecha.startsWith(hoy)).length;
       const exitosas = auditoria.filter(item => item.estado === 'exitoso').length;
-      const alertas = auditoria.filter(item => item.estado === 'alerta').length;
+      const alertasCount = auditoria.filter(item => item.estado === 'alerta').length;
 
-      if (auditEventosHoy) auditEventosHoy.textContent = eventosHoy;
+      if (auditEventosHoy) auditEventosHoy.textContent = auditoria.length;
       if (auditExitosas) auditExitosas.textContent = exitosas;
-      if (auditAlertas) auditAlertas.textContent = alertas;
+      if (auditAlertas) auditAlertas.textContent = alertasCount;
 
       // Tabla
       tbody.innerHTML = '';
@@ -1026,20 +1029,23 @@ const App = {
 
       datosFiltrados.slice(0, 50).forEach(item => { // Limitar a 50 registros
         let estadoBadge = item.estado === 'exitoso' ? 'bg-success' : item.estado === 'error' ? 'bg-danger' : 'bg-warning';
+        const fecha = new Date(item.fecha);
+        const fechaFormato = fecha.toLocaleDateString() + ' ' + fecha.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
         tbody.innerHTML += `
           <tr>
-            <td>${new Date(item.fecha).toLocaleString()}</td>
+            <td><small>${fechaFormato}</small></td>
             <td>${item.usuario}</td>
             <td>${item.accion}</td>
-            <td>${item.modulo}</td>
-            <td>${item.detalles}</td>
+            <td><span class="badge bg-light text-dark border">${item.modulo}</span></td>
+            <td><small>${item.detalles}</small></td>
             <td><span class="badge ${estadoBadge}">${item.estado}</span></td>
           </tr>
         `;
       });
     } catch (error) {
       console.error("Error cargando auditoría:", error);
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar auditoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar auditoría. Verifica la conexión.</td></tr>';
     }
   }
 }; // 💡 ¡ESTA ES LA LLAVE QUE FALTABA PARA CERRAR EL OBJETO APP!

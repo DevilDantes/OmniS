@@ -11,6 +11,13 @@ const UI = {
         link.classList.add('active');
       }
     });
+
+    // Cargar datos específicos cuando se abre una sección
+    if (sectionId === 'auditoria') {
+      if (typeof App !== 'undefined' && App.cargarAuditoria) {
+        App.cargarAuditoria();
+      }
+    }
   },
 
   // Alertas profesionales

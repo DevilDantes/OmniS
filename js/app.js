@@ -26,7 +26,8 @@ const App = {
     setInterval(App.chequearEstadoReal, 15000);
     
     setInterval(App.cargarAlertas, 15000); 
-    setInterval(App.cargarVentas, 15000); 
+    setInterval(App.cargarVentas, 15000);
+    // Auditoría se carga bajo demanda (cuando el usuario accede a la sección) 
   },
 
   actualizarInterfazUsuario: () => {
@@ -369,6 +370,21 @@ const App = {
         } finally {
           UI.setLoading(btn, false);
         }
+      });
+    }
+
+    // Event listener para filtro de auditoría
+    const auditFiltro = document.getElementById('audit-filtro');
+    if (auditFiltro) {
+      auditFiltro.addEventListener('change', () => {
+        App.cargarAuditoria();
+      });
+    }
+
+    const btnRefreshAuditoria = document.getElementById('btn-refresh-auditoria');
+    if (btnRefreshAuditoria) {
+      btnRefreshAuditoria.addEventListener('click', () => {
+        App.cargarAuditoria();
       });
     }
   },
@@ -969,6 +985,67 @@ const App = {
         if(window.Swal) Swal.fire('Error', 'Error al reactivar al usuario.', 'error');
         else alert("Error al reactivar al usuario.");
       }
+    }
+  },
+
+  cargarAuditoria: async () => {
+    // Cargar métricas de auditoría
+    const auditEventosHoy = document.getElementById('audit-eventos-hoy');
+    const auditExitosas = document.getElementById('audit-exitosas');
+    const auditAlertas = document.getElementById('audit-alertas');
+    const tbody = document.getElementById('auditoria-body');
+    const filtro = document.getElementById('audit-filtro');
+
+    if (!tbody) return;
+
+    // Mostrar cargando
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Cargando auditoría...</td></tr>';
+
+    try {
+      const auditoria = await API.get('auditoria');
+      
+      // Filtrar por tipo si hay filtro
+      let datosFiltrados = auditoria;
+      if (filtro && filtro.value !== 'todos') {
+        datosFiltrados = auditoria.filter(item => item.modulo === filtro.value);
+      }
+
+      // Métricas
+      const hoy = new Date().toISOString().split('T')[0];
+      const eventosHoy = auditoria.filter(item => item.fecha.startsWith(hoy)).length;
+      const exitosas = auditoria.filter(item => item.estado === 'exitoso').length;
+      const alertasCount = auditoria.filter(item => item.estado === 'alerta').length;
+
+      if (auditEventosHoy) auditEventosHoy.textContent = auditoria.length;
+      if (auditExitosas) auditExitosas.textContent = exitosas;
+      if (auditAlertas) auditAlertas.textContent = alertasCount;
+
+      // Tabla
+      tbody.innerHTML = '';
+      if (datosFiltrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No hay registros de auditoría.</td></tr>';
+        return;
+      }
+
+      datosFiltrados.slice(0, 50).forEach(item => { // Limitar a 50 registros
+        let estadoBadge = item.estado === 'exitoso' ? 'bg-success' : item.estado === 'error' ? 'bg-danger' : 'bg-warning';
+        const fecha = new Date(item.fecha);
+        const fechaFormato = fecha.toLocaleDateString() + ' ' + fecha.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        tbody.innerHTML += `
+          <tr>
+            <td><small>${fechaFormato}</small></td>
+            <td>${item.usuario}</td>
+            <td>${item.accion}</td>
+            <td><span class="badge bg-light text-dark border">${item.modulo}</span></td>
+            <td><small>${item.detalles}</small></td>
+            <td><span class="badge ${estadoBadge}">${item.estado}</span></td>
+          </tr>
+        `;
+      });
+    } catch (error) {
+      console.error("Error cargando auditoría:", error);
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar auditoría. Verifica la conexión.</td></tr>';
     }
   }
 }; // 💡 ¡ESTA ES LA LLAVE QUE FALTABA PARA CERRAR EL OBJETO APP!

@@ -8,85 +8,113 @@ router.get('/', async (req, res) => {
   try {
     const auditoria = [];
 
-    // 1. Ventas recientes
+    // 1. Movimientos de Inventario (datos REALES)
+    try {
+      const [movimientos] = await db.query(
+        `SELECT mi.id_movimiento, mi.tipo_movimiento, mi.cantidad, mi.fecha_movimiento, 
+                pv.sku, pv.talla, pv.color, u.nombre as usuario
+         FROM movimientos_inventario mi
+         JOIN producto_variantes pv ON mi.id_variante = pv.id_variante
+         JOIN usuarios u ON mi.id_usuario = u.id_usuario
+         ORDER BY mi.fecha_movimiento DESC LIMIT 20`
+      );
+      
+      movimientos.forEach(m => {
+        const tipoAccion = m.tipo_movimiento === 'entrada' ? 'Entrada de stock' : 
+                          m.tipo_movimiento === 'salida' ? 'Salida de stock' : 
+                          m.tipo_movimiento === 'ajuste' ? 'Ajuste de inventario' : 'Movimiento';
+        
+        auditoria.push({
+          fecha: m.fecha_movimiento,
+          usuario: m.usuario || 'Sistema',
+          accion: tipoAccion,
+          modulo: 'inventario',
+          detalles: `${m.sku} (${m.talla || 'N/A'} - ${m.color || 'N/A'}): ${m.cantidad} unidades`,
+          estado: 'exitoso'
+        });
+      });
+    } catch (err) {
+      console.log('Nota: No se pudo cargar movimientos de inventario');
+    }
+
+    // 2. Órdenes de Venta (datos REALES)
     try {
       const [ventas] = await db.query(
-        `SELECT id_venta, creado_en, total, estado FROM ventas ORDER BY creado_en DESC LIMIT 10`
+        `SELECT ov.id_orden_venta, ov.numero_orden, ov.total, ov.estado, ov.fecha_orden,
+                u.nombre as usuario, ov.canal_venta
+         FROM ordenes_venta ov
+         JOIN usuarios u ON ov.id_usuario = u.id_usuario
+         ORDER BY ov.fecha_orden DESC LIMIT 15`
       );
+      
       ventas.forEach(v => {
         auditoria.push({
-          fecha: v.creado_en || new Date().toISOString(),
-          usuario: 'Sistema',
-          accion: 'Registro de venta',
+          fecha: v.fecha_orden,
+          usuario: v.usuario || 'Sistema',
+          accion: 'Orden de venta',
           modulo: 'ventas',
-          detalles: `Venta #${v.id_venta} por $${v.total} - ${v.estado}`,
-          estado: 'exitoso'
+          detalles: `${v.numero_orden} - ${v.canal_venta} - $${v.total} (${v.estado})`,
+          estado: v.estado === 'completada' || v.estado === 'pagada' ? 'exitoso' : 'alerta'
         });
       });
     } catch (err) {
-      console.log('Nota: No se pudo cargar ventas en auditoría');
+      console.log('Nota: No se pudo cargar órdenes de venta');
     }
 
-    // 2. Productos actualizados/creados
+    // 3. Productos creados/modificados (datos REALES)
     try {
       const [productos] = await db.query(
-        `SELECT id_producto, nombre, creado_en FROM productos ORDER BY creado_en DESC LIMIT 10`
+        `SELECT id_producto, nombre, actualizado_en 
+         FROM productos 
+         ORDER BY actualizado_en DESC LIMIT 10`
       );
+      
       productos.forEach(p => {
         auditoria.push({
-          fecha: p.creado_en || new Date().toISOString(),
+          fecha: p.actualizado_en,
           usuario: 'Sistema',
-          accion: 'Creación de producto',
+          accion: 'Actualización de producto',
           modulo: 'productos',
-          detalles: `Producto creado: ${p.nombre} (#${p.id_producto})`,
+          detalles: `Producto: ${p.nombre} (#${p.id_producto})`,
           estado: 'exitoso'
         });
       });
     } catch (err) {
-      console.log('Nota: No se pudo cargar productos en auditoría');
+      console.log('Nota: No se pudo cargar productos');
     }
 
-    // 3. Movimientos de inventario
-    try {
-      const [inventario] = await db.query(
-        `SELECT id_inventario, tipo_movimiento, cantidad, creado_en FROM inventario ORDER BY creado_en DESC LIMIT 10`
-      );
-      inventario.forEach(i => {
-        auditoria.push({
-          fecha: i.creado_en || new Date().toISOString(),
-          usuario: 'Sistema',
-          accion: `${i.tipo_movimiento === 'entrada' ? 'Entrada' : 'Salida'} de stock`,
-          modulo: 'inventario',
-          detalles: `${i.tipo_movimiento === 'entrada' ? '+' : '-'}${i.cantidad} unidades`,
-          estado: 'exitoso'
-        });
-      });
-    } catch (err) {
-      console.log('Nota: No se pudo cargar inventario en auditoría');
-    }
-
-    // 4. Alertas generadas
+    // 4. Alertas (datos REALES)
     try {
       const [alertas] = await db.query(
-        `SELECT id_alerta, producto, estado, creado_en FROM alertas ORDER BY creado_en DESC LIMIT 10`
+        `SELECT a.id_alerta, a.tipo_alerta, a.valor_actual, a.valor_umbral, 
+                a.fecha_generacion, pi.sku, pi.talla
+         FROM alertas a
+         JOIN inventario inv ON a.id_inventario = inv.id_inventario
+         JOIN producto_variantes pi ON inv.id_variante = pi.id_variante
+         ORDER BY a.fecha_generacion DESC LIMIT 10`
       );
+      
       alertas.forEach(a => {
+        const tipoAlerta = a.tipo_alerta === 'stock_bajo' ? 'Stock bajo' : 
+                          a.tipo_alerta === 'stock_cero' ? 'Stock agotado' : 
+                          a.tipo_alerta === 'sobre_stock' ? 'Sobre stock' : 'Ajuste';
+        
         auditoria.push({
-          fecha: a.creado_en || new Date().toISOString(),
+          fecha: a.fecha_generacion,
           usuario: 'Sistema',
-          accion: 'Alerta de inventario',
+          accion: tipoAlerta,
           modulo: 'alertas',
-          detalles: `${a.producto}: ${a.estado}`,
-          estado: a.estado?.includes('Agotado') ? 'alerta' : 'exitoso'
+          detalles: `${a.sku} (${a.talla}): ${a.valor_actual} de ${a.valor_umbral} unidades`,
+          estado: a.valor_actual === 0 ? 'alerta' : 'exitoso'
         });
       });
     } catch (err) {
-      console.log('Nota: No se pudo cargar alertas en auditoría');
+      console.log('Nota: No se pudo cargar alertas');
     }
 
-    // Ordenar por fecha descendente y limitar a 50
+    // Ordenar por fecha descendente y limitar a 100
     auditoria.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-    const resultado = auditoria.slice(0, 50);
+    const resultado = auditoria.slice(0, 100);
 
     res.json(resultado);
   } catch (error) {

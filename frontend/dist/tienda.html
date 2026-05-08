@@ -368,7 +368,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   
   <script>
-    const API_URL = 'https://omnis-production-9049.up.railway.app/api'; 
+    const API_URL = `${window.location.origin}/api`; 
     let carrito = JSON.parse(localStorage.getItem('novastyle_carrito')) || [];
     let clienteAutenticado = JSON.parse(localStorage.getItem('novastyle_cliente')) || null;
     let variablesPago = {}; 

@@ -41,26 +41,19 @@ app.use(express.json());
 // =========================
 
 // Ruta de prueba para Railway y Make
-app.get('/api/health', async (req, res) => {
-  try {
-    // Verificar conexión DB
-    await db.query('SELECT 1');
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
-    res.json({
-      success: true,
-      message: 'API funcionando correctamente',
-      database: 'Conectada'
-    });
+// 404 APIs
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Ruta API no encontrada'
+  });
+});
 
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      success: false,
-      message: 'Error de conexión a la base de datos',
-      error: error.message
-    });
-  }
+// SPA
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
 // Auth

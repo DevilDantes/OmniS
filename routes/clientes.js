@@ -39,6 +39,25 @@ router.post('/', async (req, res) => {
       pais || 'Colombia'
     ]);
 
+    // ==========================================
+    // 🤖 IA / AUTOMATIZACIÓN: Notificar a Make del nuevo cliente
+    // ==========================================
+    const webhookUrl = process.env.MAKE_WEBHOOK_URL;
+    if (webhookUrl) {
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evento: "nuevo_cliente",
+          id_cliente: result.insertId,
+          nombre: nombre_completo,
+          correo: correo_electronico,
+          telefono: telefono || '0000000000',
+          ubicacion: `${ciudad || 'Sin especificar'}, ${pais || 'Colombia'}`
+        })
+      }).catch(err => console.error("Error notificando a Make sobre el cliente:", err));
+    }
+
     res.json({ 
       ok: true, 
       id_cliente: result.insertId, 

@@ -3,8 +3,10 @@ import { db } from '../db.js';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
-// 🔑 LLAVE MAESTRA: En el futuro esto irá en un archivo oculto (.env)
-const SECRET_KEY = 'tu_super_secreto_jwt_omnisynch'; 
+
+// 🔑 AHORA SÍ: Usamos la llave maestra desde tu archivo .env
+// Si por alguna razón no encuentra el .env, usa una de respaldo
+const SECRET_KEY = process.env.JWT_SECRET || 'tu_super_secreto_jwt_omnisynch'; 
 
 router.post('/login', async (req, res) => {
   const { correo, password } = req.body;
@@ -26,9 +28,26 @@ router.post('/login', async (req, res) => {
     const user = usuarios[0];
 
     // 2. Comparamos la contraseña
-    // 🚨 NOTA: Como en tu BD de prueba guardaste '123456' en texto plano, lo comparamos directo. 
-    // Más adelante implementaremos 'bcrypt' para encriptar esto como un profesional.
+    // 🚨 NOTA: Pendiente implementar 'bcrypt' para encriptar
     if (password !== user.password_hash) {
+      
+      // ==========================================
+      // 🤖 IA DE SEGURIDAD: Notificamos a Make del intento fallido
+      // ==========================================
+      const webhookUrl = process.env.MAKE_WEBHOOK_URL;
+      if (webhookUrl) {
+        fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            evento: "alerta_seguridad_login",
+            correo_atacado: correo,
+            rol_objetivo: user.rol,
+            mensaje: `Intento de acceso fallido para el usuario ${user.nombre}`
+          })
+        }).catch(err => console.error("Error alertando a Make:", err));
+      }
+
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
@@ -44,7 +63,6 @@ router.post('/login', async (req, res) => {
     );
 
     // 4. Se lo enviamos al frontend
-   // 4. Se lo enviamos al frontend
     res.json({
       ok: true,
       mensaje: 'Bienvenido ' + user.nombre,
@@ -52,7 +70,7 @@ router.post('/login', async (req, res) => {
       usuario: { 
         nombre: user.nombre, 
         rol: user.rol,
-        correo: user.correo // 👈 ¡ESTO ES LO QUE FALTABA!
+        correo: user.correo 
       }
     });
 

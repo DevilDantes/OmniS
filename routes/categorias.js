@@ -49,6 +49,24 @@ router.post('/', async (req, res) => {
       descripcion || ''
     ]);
 
+    // ==========================================
+    // 🤖 IA / AUTOMATIZACIÓN: Notificar a Make de la nueva categoría
+    // ==========================================
+    const webhookUrl = process.env.MAKE_WEBHOOK_URL;
+    if (webhookUrl) {
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evento: "nueva_categoria_creada",
+          id_categoria: result.insertId,
+          nombre: nombre,
+          descripcion: descripcion,
+          es_subcategoria: id_categoria_padre ? true : false
+        })
+      }).catch(err => console.error("Error notificando a Make sobre la categoría:", err));
+    }
+
     res.json({ 
       ok: true, 
       id_categoria: result.insertId,

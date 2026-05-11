@@ -387,6 +387,19 @@ const App = {
         App.cargarAuditoria();
       });
     }
+
+    // ==========================================
+    // 🤖 ESCUCHADORES PARA BOTONES DE IA
+    // ==========================================
+    const btnAlertasIA = document.getElementById('btn-ia-alertas');
+    if (btnAlertasIA) {
+      btnAlertasIA.addEventListener('click', App.analizarAlertasIA);
+    }
+
+    const btnAuditoriaIA = document.getElementById('btn-ia-auditoria');
+    if (btnAuditoriaIA) {
+      btnAuditoriaIA.addEventListener('click', App.analizarAuditoriaIA);
+    }
   },
   
   chequearEstadoReal: () => {
@@ -1047,6 +1060,49 @@ const App = {
       console.error("Error cargando auditoría:", error);
       tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar auditoría. Verifica la conexión.</td></tr>';
     }
+  },
+
+  // ==========================================
+  // 🤖 FUNCIONES DE INTELIGENCIA ARTIFICIAL
+  // ==========================================
+  analizarAlertasIA: async () => {
+    try {
+      if(window.Swal) Swal.fire({ 
+        title: 'Enviando a Make...', 
+        text: 'La IA está analizando tu inventario crítico.', 
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading() 
+      });
+
+      const data = await API.post('alertas/analizar-ia', {});
+      
+      if(window.Swal) Swal.fire('¡Datos enviados!', data.mensaje || 'Revisa tu panel de Make.', 'success');
+      else alert('¡Datos enviados a la IA!');
+
+    } catch (error) {
+      console.error("Error activando IA en alertas:", error);
+      if(window.Swal) Swal.fire('Error', 'No se pudo conectar con la IA de Make.', 'error');
+    }
+  },
+
+  analizarAuditoriaIA: async () => {
+    try {
+      if(window.Swal) Swal.fire({ 
+        title: 'Auditoría de Seguridad...', 
+        text: 'La IA está buscando movimientos sospechosos.', 
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading() 
+      });
+
+      const data = await API.post('auditoria/auditar-ia', {});
+      
+      if(window.Swal) Swal.fire('¡Datos enviados!', data.mensaje || 'Revisa tu panel de Make.', 'success');
+      else alert('¡Datos enviados a la IA!');
+
+    } catch (error) {
+      console.error("Error activando IA en auditoría:", error);
+      if(window.Swal) Swal.fire('Error', 'No se pudo enviar el reporte a la IA.', 'error');
+    }
   }
 }; // 💡 ¡ESTA ES LA LLAVE QUE FALTABA PARA CERRAR EL OBJETO APP!
 
@@ -1112,6 +1168,5 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-
 
 document.addEventListener('DOMContentLoaded', App.init);

@@ -19,41 +19,117 @@ import usuarios from '../routes/usuarios.js';
 import clientes from '../routes/clientes.js';
 import auditoria from '../routes/auditoria.js';
 
-// Configuración necesaria para usar "path" y "__dirname" en módulos ES6 (import)
+// Configuración ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-app.use(cors());
+// =========================
+// MIDDLEWARES
+// =========================
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
+
+// =========================
+// RUTAS API
+// =========================
+
+// Ruta de prueba para Railway y Make
+app.get('/api/health', async (req, res) => {
+  try {
+    // Verificar conexión DB
+    await db.query('SELECT 1');
+
+    res.json({
+      success: true,
+      message: 'API funcionando correctamente',
+      database: 'Conectada'
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Error de conexión a la base de datos',
+      error: error.message
+    });
+  }
+});
+
+// Auth
 app.use('/api/auth', auth);
 
-// 🔥 RUTAS DE LA API
+// Productos
 app.use('/api/productos', productos);
-app.use('/api/producto', productos); // para POST
+app.use('/api/producto', productos);
+
+// Inventario
 app.use('/api/inventario', inventario);
+
+// Dashboard
 app.use('/api/dashboard', dashboard);
+
+// Alertas
 app.use('/api/alertas', alertas);
+
+// Proveedores
 app.use('/api/proveedores', proveedores);
+
+// Categorías
 app.use('/api/categorias', categorias);
+
+// Ventas
 app.use('/api/ventas', ventas);
+
+// Reportes
 app.use('/api/reportes', reportes);
+
+// Marcas
 app.use('/api/marcas', marcas);
+
+// Usuarios
 app.use('/api/usuarios', usuarios);
+
+// Clientes
 app.use('/api/clientes', clientes);
+
+// Auditoría
 app.use('/api/auditoria', auditoria);
 
-
-
+// =========================
+// FRONTEND ESTÁTICO
+// =========================
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
+// =========================
+// MANEJO DE RUTAS NO ENCONTRADAS
+// =========================
+
+// Si la ruta comienza con /api y no existe
+app.use('/api/*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Ruta API no encontrada'
+  });
+});
+
+// Para SPA/frontend
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
+// =========================
+// INICIAR SERVIDOR
+// =========================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor escuchando en el puerto ${PORT}`);
-});
 
+app.listen(PORT, () => {
+  console.log(`✅ Servidor escuchando en puerto ${PORT}`);
+});

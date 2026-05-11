@@ -1,81 +1,124 @@
 import express from 'express';
-import { db } from '../db.js';
-import jwt from 'jsonwebtoken';
+import { db } from '../db.js';  
 
 const router = express.Router();
 
-// 🔑 AHORA SÍ: Usamos la llave maestra desde tu archivo .env
-// Si por alguna razón no encuentra el .env, usa una de respaldo
-const SECRET_KEY = process.env.JWT_SECRET || 'tu_super_secreto_jwt_omnisynch'; 
-
-router.post('/login', async (req, res) => {
-  const { correo, password } = req.body;
-
+// GET /api/auditoria - Obtener registros de auditoría desde la BD
+router.get('/', async (req, res) => {
   try {
-    // 1. Buscamos al usuario por correo y nos aseguramos de que esté activo
-    const [usuarios] = await db.query(
-      `SELECT id_usuario, nombre, correo, password_hash, rol 
-       FROM usuarios 
-       WHERE correo = ? AND estado = 'activo'`, 
-      [correo]
-    );
+    const auditoria = [];
 
-    // Si no existe el correo o está inactivo
-    if (usuarios.length === 0) {
-      return res.status(401).json({ error: 'Credenciales inválidas o usuario inactivo' });
-    }
-
-    const user = usuarios[0];
-
-    // 2. Comparamos la contraseña
-    // 🚨 NOTA: Pendiente implementar 'bcrypt' para encriptar
-    if (password !== user.password_hash) {
+    // 1. Movimientos de Inventario (datos REALES)
+    try {
+      const [movimientos] = await db.query(
+        `SELECT mi.id_movimiento, mi.tipo_movimiento, mi.cantidad, mi.fecha_movimiento, 
+                pv.sku, pv.talla, pv.color, u.nombre as usuario
+         FROM movimientos_inventario mi
+         JOIN producto_variantes pv ON mi.id_variante = pv.id_variante
+         JOIN usuarios u ON mi.id_usuario = u.id_usuario
+         ORDER BY mi.fecha_movimiento DESC LIMIT 20`
+      );
       
-      // ==========================================
-      // 🤖 IA DE SEGURIDAD: Notificamos a Make del intento fallido
-      // ==========================================
-      const webhookUrl = process.env.MAKE_WEBHOOK_URL;
-      if (webhookUrl) {
-        fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            evento: "alerta_seguridad_login",
-            correo_atacado: correo,
-            rol_objetivo: user.rol,
-            mensaje: `Intento de acceso fallido para el usuario ${user.nombre}`
-          })
-        }).catch(err => console.error("Error alertando a Make:", err));
-      }
-
-      return res.status(401).json({ error: 'Credenciales inválidas' });
+      movimientos.forEach(m => {
+        const tipoAccion = m.tipo_movimiento === 'entrada' ? 'Entrada de stock' : 
+                          m.tipo_movimiento === 'salida' ? 'Salida de stock' : 
+                          m.tipo_movimiento === 'ajuste' ? 'Ajuste de inventario' : 'Movimiento';
+        
+        auditoria.push({
+          fecha: m.fecha_movimiento,
+          usuario: m.usuario || 'Sistema',
+          accion: tipoAccion,
+          modulo: 'inventario',
+          detalles: `${m.sku} (${m.talla || 'N/A'} - ${m.color || 'N/A'}): ${m.cantidad} unidades`,
+          estado: 'exitoso'
+        });
+      });
+    } catch (err) {
+      console.log('Nota: No se pudo cargar movimientos de inventario');
     }
 
-    // 3. Generamos el "Gafete Virtual" (Token)
-    const token = jwt.sign(
-      { 
-        id: user.id_usuario, 
-        rol: user.rol, 
-        nombre: user.nombre 
-      },
-      SECRET_KEY,
-      { expiresIn: '8h' } // El token caduca en 8 horas
-    );
+    // 2. Órdenes de Venta (datos REALES)
+    try {
+      const [ventas] = await db.query(
+        `SELECT ov.id_orden_venta, ov.numero_orden, ov.total, ov.estado, ov.fecha_orden,
+                u.nombre as usuario, ov.canal_venta
+         FROM ordenes_venta ov
+         JOIN usuarios u ON ov.id_usuario = u.id_usuario
+         ORDER BY ov.fecha_orden DESC LIMIT 15`
+      );
+      
+      ventas.forEach(v => {
+        auditoria.push({
+          fecha: v.fecha_orden,
+          usuario: v.usuario || 'Sistema',
+          accion: 'Orden de venta',
+          modulo: 'ventas',
+          detalles: `${v.numero_orden} - ${v.canal_venta} - $${v.total} (${v.estado})`,
+          estado: v.estado === 'completada' || v.estado === 'pagada' ? 'exitoso' : 'alerta'
+        });
+      });
+    } catch (err) {
+      console.log('Nota: No se pudo cargar órdenes de venta');
+    }
 
-    // 4. Se lo enviamos al frontend
-    res.json({
-      ok: true,
-      mensaje: 'Bienvenido ' + user.nombre,
-      token: token,
-      usuario: { 
-        nombre: user.nombre, 
-        rol: user.rol,
-        correo: user.correo 
-      }
-    });
+    // 3. Productos creados/modificados (datos REALES)
+    try {
+      const [productos] = await db.query(
+        `SELECT id_producto, nombre, actualizado_en 
+         FROM productos 
+         ORDER BY actualizado_en DESC LIMIT 10`
+      );
+      
+      productos.forEach(p => {
+        auditoria.push({
+          fecha: p.actualizado_en,
+          usuario: 'Sistema',
+          accion: 'Actualización de producto',
+          modulo: 'productos',
+          detalles: `Producto: ${p.nombre} (#${p.id_producto})`,
+          estado: 'exitoso'
+        });
+      });
+    } catch (err) {
+      console.log('Nota: No se pudo cargar productos');
+    }
 
+    // 4. Alertas (datos REALES)
+    try {
+      const [alertas] = await db.query(
+        `SELECT a.id_alerta, a.tipo_alerta, a.valor_actual, a.valor_umbral, 
+                a.fecha_generacion, pi.sku, pi.talla
+         FROM alertas a
+         JOIN inventario inv ON a.id_inventario = inv.id_inventario
+         JOIN producto_variantes pi ON inv.id_variante = pi.id_variante
+         ORDER BY a.fecha_generacion DESC LIMIT 10`
+      );
+      
+      alertas.forEach(a => {
+        const tipoAlerta = a.tipo_alerta === 'stock_bajo' ? 'Stock bajo' : 
+                          a.tipo_alerta === 'stock_cero' ? 'Stock agotado' : 
+                          a.tipo_alerta === 'sobre_stock' ? 'Sobre stock' : 'Ajuste';
+        
+        auditoria.push({
+          fecha: a.fecha_generacion,
+          usuario: 'Sistema',
+          accion: tipoAlerta,
+          modulo: 'alertas',
+          detalles: `${a.sku} (${a.talla}): ${a.valor_actual} de ${a.valor_umbral} unidades`,
+          estado: a.valor_actual === 0 ? 'alerta' : 'exitoso'
+        });
+      });
+    } catch (err) {
+      console.log('Nota: No se pudo cargar alertas');
+    }
+
+    // Ordenar por fecha descendente y limitar a 100
+    auditoria.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const resultado = auditoria.slice(0, 100);
+
+    res.json(resultado);
   } catch (error) {
-    console.error("Error en login:", error);
+    console.error('Error obteniendo auditoría:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });

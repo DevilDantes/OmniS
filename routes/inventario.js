@@ -115,7 +115,7 @@ router.post('/', async (req, res) => {
       // 👉 MODIFICACIÓN 3: ¡AQUÍ ENTRA MAKE!
       // Se dispara solo cuando el stock está en peligro y la base de datos ya guardó los cambios.
       console.log(`🚀 Enviando alerta a la IA en Make...`);
-      fetch('AQUI_PEGA_LA_URL_DE_TU_WEBHOOK_DE_MAKE', {
+      fetch('https://hook.eu1.make.com/51wfzg662ea1cuqumxap4zompkkjeb9s', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

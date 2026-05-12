@@ -1,19 +1,26 @@
-import { OpenAI } from "openai";
+import express from 'express';
+import OpenAI from 'openai';
 
+const router = express.Router();
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // 👈 Así es como el código "lee" la clave sin verla
+    apiKey: process.env.OPENAI_API_KEY,
 });
 
 router.post('/analizar-ia', async (req, res) => {
-  const { producto, stock_actual } = req.body;
-  
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: "Eres un experto en logística." },
-      { role: "user", content: `El producto ${producto} tiene ${stock_actual} unidades. ¿Debo comprar más?` }
-    ],
-  });
-
-  res.json({ analisis: completion.choices[0].message.content });
+    try {
+        const { context } = req.body;
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini", // o el que prefieras
+            messages: [
+                { role: "system", content: "Eres un asistente experto en gestión de inventarios." },
+                { role: "user", content: `Analiza lo siguiente: ${JSON.stringify(context)}` }
+            ],
+        });
+        res.json({ analisis: completion.choices[0].message.content });
+    } catch (error) {
+        console.error("Error en IA:", error);
+        res.status(500).json({ error: "Error al consultar la IA" });
+    }
 });
+
+export default router; // 👈 Crucial para que server.js no explote

@@ -19,7 +19,7 @@ import usuarios from '../routes/usuarios.js';
 import clientes from '../routes/clientes.js';
 import auditoria from '../routes/auditoria.js';
 import webhook from '../routes/webhook.js';
-import ai from '../routes/ia.js'
+import ia from '../routes/ia.js';
 
 // Configuración necesaria para usar "path" y "__dirname" en módulos ES6 (import)
 const __filename = fileURLToPath(import.meta.url);

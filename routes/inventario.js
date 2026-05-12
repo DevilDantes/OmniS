@@ -1,5 +1,6 @@
 import express from 'express';
 import { db } from '../db.js';
+import https from 'https'; // 👈 Importamos el módulo nativo para conexiones seguras a Make
 
 const router = express.Router();
 
@@ -39,7 +40,6 @@ router.post('/', async (req, res) => {
 
     await connection.beginTransaction();
 
-    // 👉 MODIFICACIÓN 1: Añadimos p.nombre y el JOIN con la tabla productos
     const [invRows] = await connection.query(`
       SELECT i.id_inventario, i.stock_actual, i.stock_minimo, v.id_producto, p.nombre 
       FROM inventario i
@@ -52,10 +52,9 @@ router.post('/', async (req, res) => {
       throw new Error("El producto no está registrado en el inventario.");
     }
 
-    // 👉 MODIFICACIÓN 2: Extraemos el nombre del producto
     const { id_inventario, id_producto, stock_actual, nombre } = invRows[0];
     
-    // 💡 Aseguramos que el stock_minimo sea siempre un número (si es NULL, asume 5)
+    // Aseguramos que el stock_minimo sea siempre un número (si es NULL, asume 5)
     const stock_minimo_seguro = parseInt(invRows[0].stock_minimo) || 5;
 
     // SEGURIDAD: Evita inventario negativo
@@ -112,26 +111,74 @@ router.post('/', async (req, res) => {
         `, [id_inventario, tipoAlerta, stock_minimo_seguro, nuevo_stock, mensaje]);
       }
 
-      // 👉 MODIFICACIÓN 3: ¡AQUÍ ENTRA MAKE!
-      // Se dispara solo cuando el stock está en peligro y la base de datos ya guardó los cambios.
-      console.log(`🚀 Enviando alerta a la IA en Make...`);
-      fetch('https://hook.eu1.make.com/51wfzg662ea1cuqumxap4zompkkjeb9s', {
+      // 👉 ENVÍO A MAKE: ALERTA DE PELIGRO
+      console.log(`🚀 Intentando enviar alerta de peligro a Make...`);
+      const dataMakeAlerta = JSON.stringify({
+          nombre: nombre,
+          stock_actual: nuevo_stock,
+          stock_minimo: stock_minimo_seguro,
+          evento: "alerta" // 👈 ETIQUETA PARA EL ROUTER
+      });
+
+      const options = {
+          hostname: 'hook.eu1.make.com',
+          port: 443,
+          path: '/51wfzg662ea1cuqumxap4zompkkjeb9s',
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              nombre: nombre,
-              stock_actual: nuevo_stock,
-              stock_minimo: stock_minimo_seguro
-          })
-      }).catch(err => console.error("Error enviando a Make:", err));
+          headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(dataMakeAlerta)
+          }
+      };
+
+      const reqMake = https.request(options, (res) => console.log(`✅ Alerta enviada a Make (Status: ${res.statusCode})`));
+      reqMake.on('error', (error) => console.error(`❌ ERROR conectando con Make:`, error));
+      reqMake.write(dataMakeAlerta);
+      reqMake.end();
 
     } else {
-      console.log(`Stock Sano (${nuevo_stock} es mayor a ${stock_minimo_seguro}). Resolviendo alertas previas si existen...`);
-      await connection.query(`
-        UPDATE alertas 
-        SET estado = 'resuelta', fecha_resolucion = CURRENT_TIMESTAMP, id_usuario_resuelve = ? 
-        WHERE id_inventario = ? AND estado = 'pendiente'
-      `, [id_usuario, id_inventario]);
+      console.log(`Stock Sano (${nuevo_stock} es mayor a ${stock_minimo_seguro}).`);
+      
+      const [alertasPendientes] = await connection.query(`
+        SELECT id_alerta FROM alertas WHERE id_inventario = ? AND estado = 'pendiente'
+      `, [id_inventario]);
+
+      if (alertasPendientes.length > 0) {
+        console.log(`Resolviendo alerta previa... Avisando a Make del reabastecimiento.`);
+        
+        await connection.query(`
+          UPDATE alertas 
+          SET estado = 'resuelta', fecha_resolucion = CURRENT_TIMESTAMP, id_usuario_resuelve = ? 
+          WHERE id_inventario = ? AND estado = 'pendiente'
+        `, [id_usuario, id_inventario]);
+
+        // 👉 ENVÍO A MAKE: AVISO DE REABASTECIMIENTO
+        const dataMakeReabastecimiento = JSON.stringify({
+            nombre: nombre,
+            stock_actual: nuevo_stock,
+            stock_minimo: stock_minimo_seguro,
+            evento: "reabastecimiento" // 👈 ETIQUETA PARA EL ROUTER
+        });
+
+        const optionsReabastecimiento = {
+            hostname: 'hook.eu1.make.com',
+            port: 443,
+            path: '/51wfzg662ea1cuqumxap4zompkkjeb9s',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(dataMakeReabastecimiento)
+            }
+        };
+
+        const reqMakeReabast = https.request(optionsReabastecimiento, (res) => console.log(`✅ Aviso de reabastecimiento enviado a Make (Status: ${res.statusCode})`));
+        reqMakeReabast.on('error', (error) => console.error(`❌ ERROR conectando con Make:`, error));
+        reqMakeReabast.write(dataMakeReabastecimiento);
+        reqMakeReabast.end();
+
+      } else {
+        console.log(`No había alertas pendientes. Todo en orden.`);
+      }
     }
     console.log(`------------------------------\n`);
 

@@ -74,6 +74,21 @@ async function enviarCorreoReabastecimiento(producto, actual, minimo) {
 }
 // ==========================================
 
+// ==========================================
+// 🧪 RUTA DE PRUEBA PARA FORZAR EL CORREO
+// ==========================================
+router.get('/test-correo', async (req, res) => {
+    console.log("Iniciando prueba manual de correo e IA...");
+    try {
+        await enviarAlertaConIA("Tornillos de Prueba (Color: Gris, Talla: Única)", 1, 10);
+        res.send("Prueba enviada. Revisa la consola de Railway y tu correo.");
+    } catch (e) {
+        console.error("Error en la ruta de prueba:", e);
+        res.status(500).send("Falló: " + e.message);
+    }
+});
+// ==========================================
+
 // 🔍 GET inventario
 router.get('/', async (req, res) => {
   try {

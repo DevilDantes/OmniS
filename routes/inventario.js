@@ -15,12 +15,14 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // ✅ FIX: Configuramos Gmail explícitamente con IPv4 (family: 4) para evitar el bloqueo de Railway
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    family: 4, 
+    port: 587,
+    secure: false, // IMPORTANTE
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
+    },
+    tls: {
+        rejectUnauthorized: false
     }
 });
 

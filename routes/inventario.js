@@ -1,10 +1,80 @@
 import express from 'express';
 import { db } from '../db.js';
-import https from 'https'; // 👈 Obligatorio para que la conexión con Make nunca falle
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
 
+dotenv.config();
 const router = express.Router();
 
-// 🔍 GET inventario: Trae los datos para la tabla
+// ==========================================
+// 🛠️ CONFIGURACIÓN DE IA Y CORREOS
+// ==========================================
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+async function enviarAlertaConIA(producto, actual, minimo) {
+    try {
+        console.log(`🤖 Solicitando análisis a Gemini para: ${producto}...`);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        
+        const prompt = `
+        Actúa como un experto en logística de OmniS. 
+        DATOS DEL PRODUCTO:
+        - Nombre: ${producto}
+        - Stock Actual: ${actual}
+        - Stock Mínimo: ${minimo}
+
+        INSTRUCCIONES DE ANÁLISIS:
+        1. Si el stock es 0, la alerta es CRÍTICA.
+        2. Si el stock es menor a la mitad del mínimo, es ALTA.
+        3. Si está cerca del mínimo, es PREVENTIVA.
+
+        RESPUESTA REQUERIDA (Usa este formato):
+        🚨 NIVEL DE ALERTA: [Poner aquí el nivel]
+        📦 ESTADO: [Breve explicación del riesgo]
+        ✅ RECOMENDACIÓN: Se sugiere pedir [cantidad] unidades de este producto inmediatamente.`;
+
+        const result = await model.generateContent(prompt);
+        const analisisIA = result.response.text();
+
+        const mailOptions = {
+            from: `"OmniS Alertas" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_DESTINO,
+            subject: `⚠️ ALERTA DE STOCK: ${producto}`,
+            text: `Se ha detectado un nivel de stock crítico.\n\nProducto: ${producto}\nStock Actual: ${actual}\nStock Mínimo: ${minimo}\n\nANÁLISIS DE LA IA:\n${analisisIA}`
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log("✅ ¡Correo de alerta con IA enviado exitosamente!");
+    } catch (error) {
+        console.error("❌ Error al procesar IA o enviar correo:", error);
+    }
+}
+
+async function enviarCorreoReabastecimiento(producto, actual, minimo) {
+    try {
+        const mailOptions = {
+            from: `"OmniS Alertas" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_DESTINO,
+            subject: `✅ STOCK RECUPERADO: ${producto}`,
+            text: `El producto ha sido reabastecido y la alerta ha sido desactivada.\n\nProducto: ${producto}\nNuevo Stock: ${actual}\nStock Mínimo Requerido: ${minimo}\n\nTodo está bajo control.`
+        };
+        await transporter.sendMail(mailOptions);
+        console.log("✅ ¡Correo de reabastecimiento enviado exitosamente!");
+    } catch (error) {
+        console.error("❌ Error al enviar correo de reabastecimiento:", error);
+    }
+}
+// ==========================================
+
+// 🔍 GET inventario
 router.get('/', async (req, res) => {
   try {
     const [rows] = await db.query(`
@@ -40,7 +110,6 @@ router.post('/', async (req, res) => {
 
     await connection.beginTransaction();
 
-    // 👉 MODIFICACIÓN 1: Añadimos TODAS las tablas (p.nombre, v.talla, v.color)
     const [invRows] = await connection.query(`
       SELECT 
         i.id_inventario, 
@@ -60,16 +129,10 @@ router.post('/', async (req, res) => {
       throw new Error("El producto no está registrado en el inventario.");
     }
 
-    // 👉 MODIFICACIÓN 2: Extraemos los datos de todas las tablas
     const { id_inventario, id_producto, stock_actual, nombre, talla, color } = invRows[0];
-    
-    // 💡 Aseguramos que el stock_minimo sea siempre un número
     const stock_minimo_seguro = parseInt(invRows[0].stock_minimo) || 5;
-
-    // 💡 Creamos un nombre súper detallado para enviarlo a Make y a la IA
     const nombreProductoCompleto = `${nombre} (Talla: ${talla}, Color: ${color})`;
 
-    // SEGURIDAD: Evita inventario negativo
     if (tipo_movimiento === 'salida' && stock_actual < qty) {
       throw new Error(`Stock insuficiente. Intentas sacar ${qty}, pero solo hay ${stock_actual} disponibles.`);
     }
@@ -81,10 +144,8 @@ router.post('/', async (req, res) => {
       WHERE id_inventario = ?
     `, [qty, id_inventario]);
 
-    // Calcular el nuevo stock matemático
     const nuevo_stock = tipo_movimiento === 'entrada' ? stock_actual + qty : stock_actual - qty;
 
-    // HISTORIAL: Guardamos el registro del movimiento
     await connection.query(`
       INSERT INTO movimientos_inventario 
       (id_inventario, id_producto, id_variante, id_almacen, id_usuario, tipo_movimiento, cantidad, observacion)
@@ -94,14 +155,7 @@ router.post('/', async (req, res) => {
       tipo_movimiento, qty, observacion || 'Sin observación'
     ]);
 
-    console.log(`\n--- 🕵️‍♂️ REVISIÓN DE ALERTA ---`);
-    console.log(`Producto: ${nombreProductoCompleto}`);
-    console.log(`Stock Anterior: ${stock_actual} | Movimiento: ${tipo_movimiento} de ${qty}`);
-    console.log(`Nuevo Stock Calculado: ${nuevo_stock} | Stock Mínimo Requerido: ${stock_minimo_seguro}`);
-
     if (nuevo_stock <= stock_minimo_seguro) {
-      console.log(`¡PELIGRO! ${nuevo_stock} es menor o igual a ${stock_minimo_seguro}. Guardando alerta en la BD...`);
-      
       const [alertasPendientes] = await connection.query(`
         SELECT id_alerta FROM alertas WHERE id_inventario = ? AND estado = 'pendiente'
       `, [id_inventario]);
@@ -110,93 +164,40 @@ router.post('/', async (req, res) => {
       const mensaje = nuevo_stock === 0 ? 'Producto agotado.' : 'Nivel de reorden alcanzado.';
 
       if (alertasPendientes.length > 0) {
-        console.log(`Ya existía la alerta #${alertasPendientes[0].id_alerta}. Actualizando valores...`);
         await connection.query(`
           UPDATE alertas 
           SET valor_actual = ?, tipo_alerta = ?, mensaje = ? 
           WHERE id_alerta = ?
         `, [nuevo_stock, tipoAlerta, mensaje, alertasPendientes[0].id_alerta]);
       } else {
-        console.log(`Creando nueva alerta en la base de datos...`);
         await connection.query(`
           INSERT INTO alertas (id_inventario, tipo_alerta, valor_umbral, valor_actual, mensaje, estado)
           VALUES (?, ?, ?, ?, ?, 'pendiente')
         `, [id_inventario, tipoAlerta, stock_minimo_seguro, nuevo_stock, mensaje]);
       }
 
-      // 👉 ENVÍO A MAKE: ALERTA DE PELIGRO
-      console.log(`🚀 Enviando alerta a Make...`);
-      const dataMakeAlerta = JSON.stringify({
-          nombre: nombreProductoCompleto, // <-- Ahora enviará "Camisa (Talla: L, Color: Azul)"
-          stock_actual: nuevo_stock,
-          stock_minimo: stock_minimo_seguro,
-          evento: "alerta" // <-- Clave para el Router de Make
-      });
-
-      const options = {
-          hostname: 'hook.eu1.make.com',
-          port: 443,
-          path: '/51wfzg662ea1cuqumxap4zompkkjeb9s',
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json',
-              'Content-Length': Buffer.byteLength(dataMakeAlerta)
-          }
-      };
-
-      const reqMake = https.request(options, (res) => console.log(`✅ Alerta enviada a Make (Status: ${res.statusCode})`));
-      reqMake.on('error', (error) => console.error(`❌ ERROR conectando con Make:`, error));
-      reqMake.write(dataMakeAlerta);
-      reqMake.end();
+      // 👉 ¡MAGIA! Disparamos el correo con IA sin detener el servidor
+      enviarAlertaConIA(nombreProductoCompleto, nuevo_stock, stock_minimo_seguro);
 
     } else {
-      console.log(`Stock Sano (${nuevo_stock} es mayor a ${stock_minimo_seguro}). Resolviendo alertas previas...`);
-      
       const [alertasPendientes] = await connection.query(`
         SELECT id_alerta FROM alertas WHERE id_inventario = ? AND estado = 'pendiente'
       `, [id_inventario]);
 
       if (alertasPendientes.length > 0) {
-        console.log(`Avisando a Make del reabastecimiento.`);
-        
         await connection.query(`
           UPDATE alertas 
           SET estado = 'resuelta', fecha_resolucion = CURRENT_TIMESTAMP, id_usuario_resuelve = ? 
           WHERE id_inventario = ? AND estado = 'pendiente'
         `, [id_usuario, id_inventario]);
 
-        // 👉 ENVÍO A MAKE: AVISO DE REABASTECIMIENTO
-        const dataMakeReabastecimiento = JSON.stringify({
-            nombre: nombreProductoCompleto,
-            stock_actual: nuevo_stock,
-            stock_minimo: stock_minimo_seguro,
-            evento: "reabastecimiento" // <-- Clave para el Router de Make
-        });
-
-        const optionsReabastecimiento = {
-            hostname: 'hook.eu1.make.com',
-            port: 443,
-            path: '/51wfzg662ea1cuqumxap4zompkkjeb9s',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(dataMakeReabastecimiento)
-            }
-        };
-
-        const reqMakeReabast = https.request(optionsReabastecimiento, (res) => console.log(`✅ Aviso de reabastecimiento enviado a Make (Status: ${res.statusCode})`));
-        reqMakeReabast.on('error', (error) => console.error(`❌ ERROR conectando con Make:`, error));
-        reqMakeReabast.write(dataMakeReabastecimiento);
-        reqMakeReabast.end();
-
-      } else {
-        console.log(`No había alertas pendientes. Todo en orden.`);
+        // 👉 ¡MAGIA! Disparamos el correo de reabastecimiento
+        enviarCorreoReabastecimiento(nombreProductoCompleto, nuevo_stock, stock_minimo_seguro);
       }
     }
-    console.log(`------------------------------\n`);
 
     await connection.commit();
-    res.json({ ok: true, message: "Movimiento y alertas registrados correctamente" });
+    res.json({ ok: true, message: "Movimiento procesado correctamente" });
 
   } catch (error) {
     await connection.rollback();

@@ -1,7 +1,7 @@
 import express from 'express';
 import { db } from '../db.js';
 import jwt from 'jsonwebtoken';
-import fetch from 'node-fetch'; // 👈 CRUCIAL: Esto permite que Railway conecte con Make
+import fetch from 'node-fetch'; 
 
 const router = express.Router();
 

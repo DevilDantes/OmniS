@@ -167,8 +167,8 @@ router.get('/test-reporte-ia', async (req, res) => {
 // ======================================================
 // ⏰ AUTOMÁTICO CADA 2 DÍAS
 // ======================================================
-cron.schedule('* * * * *', async () => {
-
+cron.schedule('0 8 */2 * *', async () => {
+  
   console.log("🕒 Ejecutando reporte automático IA...");
 
   await enviarReporteInventarioCritico();

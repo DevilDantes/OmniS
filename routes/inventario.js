@@ -77,14 +77,23 @@ async function enviarCorreoReabastecimiento(producto, actual, minimo) {
 // ==========================================
 // 🧪 RUTA DE PRUEBA PARA FORZAR EL CORREO
 // ==========================================
-router.get('/test-correo', async (req, res) => {
-    console.log("Iniciando prueba manual de correo e IA...");
+router.get('/test-modelos', async (req, res) => {
     try {
-        await enviarAlertaConIA("Tornillos de Prueba (Color: Gris, Talla: Única)", 1, 10);
-        res.send("Prueba enviada. Revisa la consola de Railway y tu correo.");
+        const apiKey = process.env.GEMINI_API_KEY;
+        // Hacemos una petición directa a la API de Google saltándonos la librería
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        const data = await response.json();
+        
+        // Si responde bien, filtramos solo los nombres para que sea fácil de leer
+        if (data.models) {
+            const nombres = data.models.map(m => m.name.replace('models/', ''));
+            res.json({ exito: true, modelos_que_puedes_usar: nombres });
+        } else {
+            // Si hay un error con tu llave, nos lo dirá aquí
+            res.json({ exito: false, error_de_google: data });
+        }
     } catch (e) {
-        console.error("Error en la ruta de prueba:", e);
-        res.status(500).send("Falló: " + e.message);
+        res.status(500).json({ error_interno: e.message });
     }
 });
 // ==========================================

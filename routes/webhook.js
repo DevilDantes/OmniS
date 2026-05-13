@@ -1,84 +1,35 @@
 import express from 'express';
-import axios from 'axios';
 
 const router = express.Router();
 
-// ========================================
-// VERIFICAR WEBHOOK META
-// ========================================
-router.get('/', (req, res) => {
-
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-
-  if (
-    mode &&
-    token === process.env.VERIFY_TOKEN
-  ) {
-
-    console.log('✅ Webhook verificado');
-
-    return res.status(200).send(challenge);
-  }
-
-  res.sendStatus(403);
-});
-
-// ========================================
-// RECIBIR MENSAJES WHATSAPP
-// ========================================
-router.post('/', async (req, res) => {
-
+// Webhook de prueba desde Make
+router.post('/make', async (req, res) => {
   try {
 
-    const body = req.body;
+    console.log('📩 Datos recibidos desde Make:');
+    console.log(req.body);
 
-    console.log(
-      JSON.stringify(body, null, 2)
-    );
+    // Aquí puedes hacer lógica:
+    // guardar en DB
+    // crear producto
+    // actualizar inventario
+    // etc
 
-    const message =
-      body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-
-    if (!message) {
-      return res.sendStatus(200);
-    }
-
-    const from = message.from;
-
-    const text =
-      message.text?.body || '';
-
-    console.log(`📩 ${from}: ${text}`);
-
-    // RESPUESTA SIMPLE
-    await axios.post(
-      `https://graph.facebook.com/v22.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
-      {
-        messaging_product: 'whatsapp',
-        to: from,
-        text: {
-          body: '👋 Hola desde OmniS'
-        }
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    res.sendStatus(200);
+    return res.status(200).json({
+      success: true,
+      message: 'Webhook recibido correctamente',
+      data: req.body
+    });
 
   } catch (error) {
 
-    console.error(
-      error.response?.data || error.message
-    );
+    console.error(error);
 
-    res.sendStatus(500);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+
   }
 });
 

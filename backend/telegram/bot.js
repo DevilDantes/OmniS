@@ -4,7 +4,13 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const bot = new TelegramBot(
   process.env.TELEGRAM_BOT_TOKEN,
   {
-    polling: true
+    polling: {
+      interval: 3000,
+      autoStart: true,
+      params: {
+        timeout: 10
+      }
+    }
   }
 );
 

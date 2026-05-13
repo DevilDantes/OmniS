@@ -167,7 +167,7 @@ router.get('/test-reporte-ia', async (req, res) => {
 // ======================================================
 // ⏰ AUTOMÁTICO CADA 2 DÍAS
 // ======================================================
-cron.schedule('0 8 */2 * *', async () => {
+cron.schedule('* * * * *', async () => {
 
   console.log("🕒 Ejecutando reporte automático IA...");
 

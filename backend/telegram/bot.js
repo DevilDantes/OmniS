@@ -2,7 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const bot = new TelegramBot(
-  process.env.TELEGRAM_TOKEN,
+  process.env.TELEGRAM_BOT_TOKEN,
   {
     polling: true
   }
@@ -24,7 +24,7 @@ bot.on('message', async (msg) => {
     console.log('📩 Usuario:', text);
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash'
+      model: 'gemini-2.5-flash'
     });
 
     const result =

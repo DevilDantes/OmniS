@@ -11,8 +11,13 @@ const router = express.Router();
 // 🛠️ CONFIGURACIÓN DE IA Y CORREOS
 // ==========================================
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// ✅ FIX: Configuramos Gmail explícitamente con IPv4 (family: 4) para evitar el bloqueo de Railway
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    family: 4, 
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -22,7 +27,8 @@ const transporter = nodemailer.createTransport({
 async function enviarAlertaConIA(producto, actual, minimo) {
     try {
         console.log(`🤖 Solicitando análisis a Gemini para: ${producto}...`);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        // Usamos el modelo oficial actual. Si te vuelve a dar 404, cámbialo a "gemini-1.0-pro"
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         
         const prompt = `
         Actúa como un experto en logística de OmniS. 

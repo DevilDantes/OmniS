@@ -20,8 +20,8 @@ import clientes from '../routes/clientes.js';
 import auditoria from '../routes/auditoria.js';
 import webhook from '../routes/webhook.js';
 import ia from '../routes/ia.js';
+import './telegram/bot.js';
 
-// Configuración necesaria para usar "path" y "__dirname" en módulos ES6 (import)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -31,9 +31,8 @@ app.use(cors());
 app.use(express.json());
 app.use('/api/auth', auth);
 
-// 🔥 RUTAS DE LA API
 app.use('/api/productos', productos);
-app.use('/api/producto', productos); // para POST
+app.use('/api/producto', productos);
 app.use('/api/inventario', inventario);
 app.use('/api/dashboard', dashboard);
 app.use('/api/alertas', alertas);
@@ -48,10 +47,6 @@ app.use('/api/auditoria', auditoria);
 app.use('/api/webhook', webhook);
 app.use('/api/ia', ia);
 
-
-
-
-
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 app.use((req, res) => {
@@ -62,4 +57,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
-

@@ -16,6 +16,7 @@
     "mysql2": "^3.9.7",
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
+    "node-telegram-bot-api": "^0.67.0",
     "nodemailer": "^8.0.7",
     "openai": "^6.37.0",
     "resend": "^6.12.3"

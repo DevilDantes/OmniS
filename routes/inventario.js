@@ -1,7 +1,7 @@
 import express from 'express';
 import { db } from '../db.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -11,25 +11,11 @@ const router = express.Router();
 // 🛠️ CONFIGURACIÓN DE IA Y CORREOS
 // ==========================================
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// ✅ FIX: Configuramos Gmail explícitamente con IPv4 (family: 4) para evitar el bloqueo de Railway
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // IMPORTANTE
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        rejectUnauthorized: false
-    }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function enviarAlertaConIA(producto, actual, minimo) {
     try {
         console.log(`🤖 Solicitando análisis a Gemini para: ${producto}...`);
-        // Usamos el modelo oficial actual. Si te vuelve a dar 404, cámbialo a "gemini-1.0-pro"
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         
         const prompt = `
@@ -52,14 +38,13 @@ async function enviarAlertaConIA(producto, actual, minimo) {
         const result = await model.generateContent(prompt);
         const analisisIA = result.response.text();
 
-        const mailOptions = {
-            from: `"OmniS Alertas" <${process.env.EMAIL_USER}>`,
+        await resend.emails.send({
+            from: 'OmniS Alertas <onboarding@resend.dev>',
             to: process.env.EMAIL_DESTINO,
             subject: `⚠️ ALERTA DE STOCK: ${producto}`,
             text: `Se ha detectado un nivel de stock crítico.\n\nProducto: ${producto}\nStock Actual: ${actual}\nStock Mínimo: ${minimo}\n\nANÁLISIS DE LA IA:\n${analisisIA}`
-        };
+        });
 
-        await transporter.sendMail(mailOptions);
         console.log("✅ ¡Correo de alerta con IA enviado exitosamente!");
     } catch (error) {
         console.error("❌ Error al procesar IA o enviar correo:", error);
@@ -68,13 +53,13 @@ async function enviarAlertaConIA(producto, actual, minimo) {
 
 async function enviarCorreoReabastecimiento(producto, actual, minimo) {
     try {
-        const mailOptions = {
-            from: `"OmniS Alertas" <${process.env.EMAIL_USER}>`,
+        await resend.emails.send({
+            from: 'OmniS Alertas <onboarding@resend.dev>',
             to: process.env.EMAIL_DESTINO,
             subject: `✅ STOCK RECUPERADO: ${producto}`,
             text: `El producto ha sido reabastecido y la alerta ha sido desactivada.\n\nProducto: ${producto}\nNuevo Stock: ${actual}\nStock Mínimo Requerido: ${minimo}\n\nTodo está bajo control.`
-        };
-        await transporter.sendMail(mailOptions);
+        });
+
         console.log("✅ ¡Correo de reabastecimiento enviado exitosamente!");
     } catch (error) {
         console.error("❌ Error al enviar correo de reabastecimiento:", error);
@@ -184,7 +169,7 @@ router.post('/', async (req, res) => {
       `, [id_inventario]);
 
       const tipoAlerta = nuevo_stock === 0 ? 'stock_cero' : 'stock_bajo';
-      const mensaje = nuevo_stock === 0 ? 'Producto agotado.' : 'Nivel de reorden alcanzado.';
+      const mensaje = nuevo_stock === 0 ? 'Producto agotado.' : 'Nivel de reorden alcanzado.'
 
       if (alertasPendientes.length > 0) {
         await connection.query(`

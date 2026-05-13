@@ -22,7 +22,7 @@ const transporter = nodemailer.createTransport({
 async function enviarAlertaConIA(producto, actual, minimo) {
     try {
         console.log(`🤖 Solicitando análisis a Gemini para: ${producto}...`);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         
         const prompt = `
         Actúa como un experto en logística de OmniS. 

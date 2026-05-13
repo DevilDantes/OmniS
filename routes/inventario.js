@@ -28,7 +28,7 @@ async function enviarAlertaConIA(producto, actual, minimo) {
     try {
         console.log(`🤖 Solicitando análisis a Gemini para: ${producto}...`);
         // Usamos el modelo oficial actual. Si te vuelve a dar 404, cámbialo a "gemini-1.0-pro"
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         
         const prompt = `
         Actúa como un experto en logística de OmniS. 

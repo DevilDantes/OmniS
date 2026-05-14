@@ -50,12 +50,17 @@ bot.on('message', async (msg) => {
     console.log(`📩 Usuario (${chatId}):`, text);
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.5-flash', // Asegúrate de tener acceso a esta versión, si no, usa 'gemini-1.5-flash'
       tools: herramientas
     });
 
+    // --- CORRECCIÓN APLICADA AQUÍ ---
     const chat = model.startChat({
-      systemInstruction: "Eres OmniBot. Ayudas con inventario, stock, compras y ventas. Responde corto, profesional y basándote únicamente en los datos que te provee el sistema."
+      systemInstruction: {
+        parts: [{ 
+          text: "Eres OmniBot. Ayudas con inventario, stock, compras y ventas. Responde corto, profesional y basándote únicamente en los datos que te provee el sistema." 
+        }]
+      }
     });
 
     // Enviamos el texto del usuario
